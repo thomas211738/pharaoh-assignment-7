@@ -131,10 +131,10 @@
                 <h2>Data Generation Results</h2>
 
                 <h3>Scatter Plot with Regression Line</h3>
-                <img src="{{ url_for('static', filename='plot1.png') }}" alt="Regression Plot">
+                <img src="{{ url_for('static', filename='plot1.png') }}?{{ unique_id }}" alt="Regression Plot">
 
                 <h3>Histogram of Slopes and Intercepts</h3>
-                <img src="{{ url_for('static', filename='plot2.png') }}" alt="Histogram Plot">
+                <img src="{{ url_for('static', filename='plot2.png') }}?{{ unique_id }}" alt="Histogram Plot">
 
                 {% if slope_extreme is defined and slope_extreme is not none %}
                     <p><strong>Proportion of slopes more extreme than observed slope:</strong> {{ slope_extreme | round(4) }}</p>
@@ -215,7 +215,7 @@
                     <p><strong>{{ confidence_level }}% Confidence Interval for {{ parameter.capitalize() }}:</strong> [{{ ci_lower | round(4) }}, {{ ci_upper | round(4) }}]</p>
                     <p><strong>Mean Estimate:</strong> {{ mean_estimate | round(4) }}</p>
                     <p><strong>Confidence Interval Includes True Parameter:</strong> {{ includes_true }}</p>
-                    <img src="{{ url_for('static', filename='plot4.png') }}" alt="Confidence Interval Plot">
+                    <img src="{{ url_for('static', filename='plot4.png') }}?{{ unique_id }}" alt="Confidence Interval Plot">
                 {% endif %}
 
             </div>

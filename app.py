@@ -1,3 +1,4 @@
+
 from flask import Flask, render_template, request, url_for, session
 import numpy as np
 import matplotlib
@@ -37,6 +38,7 @@ def generate_data(N, mu, beta0, beta1, sigma2, S):
     plt.legend()
     plt.title('Scatter plot with fitted regression line')
     plot1_path = "static/plot1.png"
+
     plt.savefig(plot1_path)
     plt.close()
 
@@ -132,6 +134,7 @@ def index():
         session["beta1"] = beta1
         session["S"] = S
 
+        unique_id = np.random.randint(0, 100000)
         # Return render_template with variables
         return render_template(
             "index.html",
@@ -145,6 +148,7 @@ def index():
             beta0=beta0,
             beta1=beta1,
             S=S,
+            unique_id=unique_id,
         )
     return render_template("index.html")
 
@@ -169,32 +173,35 @@ def hypothesis_test():
 
     parameter = request.form.get("parameter")
     test_type = request.form.get("test_type")
+    unique_id = np.random.randint(0, 100000)
 
-    # Use the slopes or intercepts from the simulations
+    # Determine simulated statistics and hypothesis values
     if parameter == "slope":
-        simulated_stats = np.array(slopes)
+        simulated_stats = slopes
         observed_stat = slope
         hypothesized_value = beta1
     else:
-        simulated_stats = np.array(intercepts)
+        simulated_stats = intercepts
         observed_stat = intercept
         hypothesized_value = beta0
 
-    # TODO 10: Calculate p-value based on test type
-    if test_type == "two-tailed":
+    
+    # Calculate p-value based on test type
+    if test_type == "!=":
         p_value = 2 * np.mean(np.abs(simulated_stats - hypothesized_value) >= np.abs(observed_stat - hypothesized_value))
-    elif test_type == "greater":
+    elif test_type == ">":
         p_value = np.mean(simulated_stats >= observed_stat)
     else:  # "less"
         p_value = np.mean(simulated_stats <= observed_stat)
 
-    # TODO 11: If p_value is very small (e.g., <= 0.0001), set fun_message to a fun message
+    app.logger.info(f"P-value: {p_value}")
+
     if p_value <= 0.0001:
-        fun_message = "Wow! That's a very small p-value!"
+        fun_message = "Wow! That's a very small p-value; it's a rare event!"
     else:
         fun_message = None
 
-    # TODO 12: Plot histogram of simulated statistics
+    # Plot histogram of simulated statistics
     plt.figure()
     plt.hist(simulated_stats, bins=30, alpha=0.5, label='Simulated stats')
     plt.axvline(observed_stat, color='red', linestyle='dashed', linewidth=2, label=f'Observed {parameter}')
@@ -205,7 +212,6 @@ def hypothesis_test():
     plt.title('Histogram of simulated statistics')
     
     plt.savefig('static/plot3.png')
-    unique_id = np.random.randint(0, 100000)
     plt.close()
 
     # Return results to template
@@ -221,11 +227,11 @@ def hypothesis_test():
         beta0=beta0,
         beta1=beta1,
         S=S,
-        # TODO 13: Uncomment the following lines when implemented
         p_value=p_value,
         fun_message=fun_message,
         unique_id=unique_id,
     )
+
 
 @app.route("/confidence_interval", methods=["POST"])
 def confidence_interval():
@@ -237,7 +243,6 @@ def confidence_interval():
     beta1 = float(session.get("beta1"))
     S = int(session.get("S"))
 
-    
     slope = float(session.get("slope"))
     intercept = float(session.get("intercept"))
     
@@ -245,62 +250,48 @@ def confidence_interval():
     intercepts = np.array(json.loads(session.get("intercepts")), dtype=float)
 
     parameter = request.form.get("parameter")
-    confidence_level = float(request.form.get("confidence_level"))/100
+    confidence_level = float(request.form.get("confidence_level")) / 100
 
-    # Use the slopes or intercepts from the simulations
+    # Use slopes or intercepts based on selected parameter
     if parameter == "slope":
-        estimates = np.array(slopes)
+        estimates = slopes
         observed_stat = slope
         true_param = beta1
     else:
-        estimates = np.array(intercepts)
+        estimates = intercepts
         observed_stat = intercept
         true_param = beta0
 
-    # TODO 14: Calculate mean and standard deviation of the estimates
+    # Calculate mean and standard deviation of the estimates
     mean_estimate = np.mean(estimates)
-    std_estimate = np.std(estimates)
+    std_estimate = np.std(estimates, ddof=1)
 
-    # TODO 15: Calculate confidence interval for the parameter estimate
-    # Use the t-distribution and confidence_level
-    print(confidence_level)
-    t_value = t.ppf((1 + confidence_level) / 2, df=S-1)
-
+    # Calculate confidence interval
+    t_value = t.ppf((1 + confidence_level) / 2, df=S - 1)
     margin_of_error = t_value * (std_estimate / np.sqrt(S))
     ci_lower = mean_estimate - margin_of_error
     ci_upper = mean_estimate + margin_of_error
 
-    # TODO 16: Check if confidence interval includes true parameter
+    # Check if confidence interval includes the true parameter
     includes_true = ci_lower <= true_param <= ci_upper
 
-    # TODO 17: Plot the individual estimates as gray points and confidence interval
-    # Plot the mean estimate as a colored point which changes if the true parameter is included
-    # Plot the confidence interval as a horizontal line
-    # Plot the true parameter value
+    # Plotting
     plt.figure()
-
-    # Scatter plot for the simulated estimates
     plt.scatter(estimates, [0]*len(estimates), color='gray', alpha=0.5, label='Simulated Estimates')
-
-    # Mean estimate with confidence interval error bar
     plt.errorbar(mean_estimate, 0, xerr=margin_of_error, fmt='o', color='blue', label='Mean Estimate')
-
-    # Confidence interval
-    plt.hlines(0, mean_estimate - margin_of_error, mean_estimate + margin_of_error, color='blue', linewidth=2, label=f'{confidence_level*100}% Confidence Interval')
-
-    # True slope line
-    plt.axvline(x=true_param, color='green', linestyle='dashed', linewidth=2, label=f'True {parameter}')
-
-    plt.xlabel('Slope Estimate')
+    plt.hlines(0, ci_lower, ci_upper, color='blue', linewidth=2, label=f'{confidence_level*100:.1f}% Confidence Interval')
+    plt.axvline(x=true_param, color='green', linestyle='dashed', linewidth=2, label=f'True {parameter.capitalize()}')
+    plt.xlabel(f'{parameter.capitalize()} Estimate')
     plt.ylabel('')
     plt.yticks([])
-    plt.title('90.0% Confidence Interval for Slope (Mean Estimate)')
+    plt.title(f"{confidence_level*100:.1f}% Confidence Interval for {parameter.capitalize()} (Mean Estimate)")
     plt.legend()
+
     plot4_path = "static/plot4.png"
     plt.savefig(plot4_path)
     plt.close()
+    unique_id = np.random.randint(0, 100000)
 
-    # Return results to template
     return render_template(
         "index.html",
         plot1="static/plot1.png",
@@ -319,8 +310,8 @@ def confidence_interval():
         beta0=beta0,
         beta1=beta1,
         S=S,
+        unique_id=unique_id,
     )
-
 
 if __name__ == "__main__":
     app.run(debug=True)
